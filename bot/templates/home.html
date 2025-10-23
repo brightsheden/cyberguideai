@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberGuide - AI Cybersecurity Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=Inter:wght@400;500;600&family=Fira+Code&display=swap" rel="stylesheet">
+    <!-- Alpine.js for reactive UI -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+        }
+        .font-header {
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
+        }
+        .font-mono {
+            font-family: 'Fira Code', 'JetBrains Mono', monospace;
+        }
+        .glow-green {
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+        }
+        .glow-cyan {
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
+        }
+        .scan-line {
+            background: linear-gradient(180deg, transparent, rgba(0, 255, 65, 0.1), transparent);
+            animation: scan 2s linear infinite;
+        }
+        @keyframes scan {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+        .pulse-dot {
+            animation: pulse-dot 1.4s infinite;
+        }
+        .pulse-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .pulse-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        .hex-pattern {
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0l25.98 15v30L30 60 4.02 45V15z' fill='none' stroke='%232a2a2a' stroke-width='1' opacity='0.3'/%3E%3C/svg%3E");
+        }
+        .message-slide-up {
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .transition-smooth {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .hover-lift:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+        }
+        .sidebar {
+            transition: transform 0.3s ease;
+        }
+        .sidebar.hidden {
+            transform: translateX(-100%);
+        }
+        .code-block {
+            position: relative;
+        }
+        .copy-btn {
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .code-block:hover .copy-btn {
+            opacity: 1;
+        }
+        .drag-overlay {
+            background: rgba(0, 255, 65, 0.05);
+            border: 2px dashed #00ff41;
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, #00ff41, #00d9ff, #00ff41);
+            background-size: 200% 100%;
+            animation: gradient-shift 2s linear infinite;
+        }
+        @keyframes gradient-shift {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
+    </style>
+</head>
+<body class="hex-pattern">
+    <!-- Header -->
+    <header class="fixed top-0 left-0 right-0 h-16 bg-black/80 backdrop-blur-md border-b border-[#2a2a2a] z-50">
+        <div class="max-w-full h-full px-6 flex items-center justify-between">
+            <div class="flex items-center gap-8">
+                <div class="flex items-center gap-3">
+                    <div class="text-2xl">🛡️</div>
+                    <a href="#">
+                         <h1 class="font-header text-2xl font-bold tracking-tight">CYBERGUIDE</h1>
+                    </a>
+                   
+                </div>
+            
+            </div>
+            <div class="flex items-center gap-4">
+                <button id="sidebarToggle" class="p-2 hover:bg-[#1a1a1a] rounded-lg transition-smooth md:hidden">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+                <button class="w-10 h-10 rounded-full bg-[#1a1a1a] flex items-center justify-center hover:bg-[#2a2a2a] transition-smooth">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex pt-16 h-screen">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar w-72 bg-[#0a0a0a] border-r border-[#2a2a2a] overflow-y-auto fixed md:sticky top-16 left-0 h-[calc(100vh-4rem)] z-40">
+            <div class="p-6 space-y-6">
+                <!-- History Section -->
+                <div>
+                    <h3 class="flex items-center gap-2 text-sm font-semibold mb-3 text-[#a3a3a3]">
+                        <span>🕒</span> History
+                    </h3>
+                    <div id="historyList" class="space-y-2">
+                        <!-- History items will be populated here by JS -->
+                    </div>
+                </div>
+
+                <!-- Quick Tools -->
+                <div>
+                    <h3 class="flex items-center gap-2 text-sm font-semibold mb-3 text-[#a3a3a3]">
+                        <span>🔧</span> Quick Tools
+                    </h3>
+                    <div class="space-y-2">
+                     
+                     
+                        <a href="/tools/link/" class="block w-full text-left p-3 bg-[#141414] hover:bg-[#1a1a1a] hover:border-[#00d9ff] rounded-lg border border-[#2a2a2a] transition-smooth flex items-center gap-2">
+                            <span>🔗</span>
+                            <span class="text-sm">Analyze Link</span>
+                        </a>
+                        <a href="/tools/email/" class="block w-full text-left p-3 bg-[#141414] hover:bg-[#1a1a1a] hover:border-[#00d9ff] rounded-lg border border-[#2a2a2a] transition-smooth flex items-center gap-2">
+                            <span>✉️</span>
+                            <span class="text-sm">Analyze Email</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+    <main x-data="tooling()" class="flex-1 flex flex-col max-w-full md:max-w-4xl mx-auto w-full">
+            <!-- Messages Container -->
+            <div id="messagesContainer" class="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+                <!-- Welcome Screen -->
+                <div id="welcomeScreen" class="flex flex-col items-center justify-center h-full text-center space-y-6">
+                    <div class="text-6xl mb-2">🛡️</div>
+                    <h2 class="font-header text-3xl font-bold">CYBERGUIDE</h2>
+                    <p class="text-[#a3a3a3] text-lg">Powered by AI Cybersecurity</p>
+                    {% comment %} <div class="flex flex-wrap gap-4 justify-center mt-8">
+                        <button class="px-6 py-3 bg-[#00ff41] text-black font-semibold rounded-lg hover:bg-[#00d92b] transition-smooth hover:scale-105">
+                            Start New Scan
+                        </button>
+                        <button class="px-6 py-3 bg-transparent border-2 border-[#00ff41] text-[#00ff41] font-semibold rounded-lg hover:bg-[#00ff41] hover:text-black transition-smooth">
+                            Ask a Question
+                        </button>
+                    </div> {% endcomment %}
+                    <p class="text-[#737373] text-sm mt-6">
+                        <span class="text-[#00d9ff] font-mono">AI Cybersecurity Assistant</span>
+                    </p>
+                </div>
+
+                <div id="chatMessages" class="space-y-4 hidden"></div>
+                <!-- Typing Indicator -->
+                <div id="typingIndicator" class="flex justify-start hidden">
+                    <div class="bg-[#141414] border-l-2 border-[#00d9ff] rounded-xl px-4 py-3 flex items-center gap-2">
+                        <div class="flex gap-1">
+                            <div class="w-2 h-2 bg-[#00ff41] rounded-full pulse-dot"></div>
+                            <div class="w-2 h-2 bg-[#00ff41] rounded-full pulse-dot"></div>
+                            <div class="w-2 h-2 bg-[#00ff41] rounded-full pulse-dot"></div>
+                        </div>
+                        <span class="text-[#a3a3a3] text-sm">...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="border-t border-[#2a2a2a] bg-[#0a0a0a]/95 backdrop-blur-md p-4">
+                <div class="max-w-4xl mx-auto">
+                    <!-- Session indicator / controls -->
+                    <div id="sessionBar" class="flex items-center justify-between mb-3 text-xs text-[#a3a3a3]">
+                        <div>Session: <span id="sessionIdDisplay">(none)</span></div>
+                        <div>
+                            <button id="newSessionBtn" class="px-2 py-1 bg-[#141414] border border-[#2a2a2a] rounded">New session</button>
+                        </div>
+                    </div>
+                    <!-- Suggested Prompts (show on first use) -->
+                    <div id="suggestedPrompts" class="flex flex-wrap gap-2 mb-3">
+                        <button class="px-3 py-1.5 bg-[#141414] border border-[#2a2a2a] rounded-full text-xs text-[#a3a3a3] hover:border-[#00ff41] hover:text-[#00ff41] transition-smooth">
+                            Scan for SQL injection
+                        </button>
+                        <button class="px-3 py-1.5 bg-[#141414] border border-[#2a2a2a] rounded-full text-xs text-[#a3a3a3] hover:border-[#00ff41] hover:text-[#00ff41] transition-smooth">
+                            Check password strength
+                        </button>
+                        <button class="px-3 py-1.5 bg-[#141414] border border-[#2a2a2a] rounded-full text-xs text-[#a3a3a3] hover:border-[#00ff41] hover:text-[#00ff41] transition-smooth">
+                            Analyze network traffic
+                        </button>
+                    </div>
+
+                    <!-- Input Container (Alpine.js) -->
+                    <div class="relative" x-data="chatComponent()">
+                        {% comment %} <div class="mb-3">
+                            <label class="text-xs text-[#a3a3a3]">Upload file for scan</label>
+                            <input id="fileInput" type="file" class="mt-1" />
+                            <button id="uploadBtn" class="ml-2 px-3 py-1 bg-[#00d9ff] text-black rounded" type="button">Upload</button>
+                        </div> {% endcomment %}
+                        <form @submit.prevent="submit()" class="flex items-end gap-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-2 focus-within:border-[#00ff41] focus-within:glow-green transition-smooth w-full">
+                            <button type="button" class="p-2 hover:bg-[#2a2a2a] rounded-lg transition-smooth flex-shrink-0">
+                                <svg class="w-5 h-5 text-[#a3a3a3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
+                                </svg>
+                            </button>
+                            <textarea 
+                                id="messageInput"
+                                x-model="message"
+                                placeholder="Type your message..." 
+                                rows="1"
+                                x-ref="input"
+                                @input="autoresize"
+                                class="flex-1 bg-transparent border-none outline-none resize-none text-white placeholder-[#737373] max-h-32"
+                            ></textarea>
+                            <input type="hidden" name="csrfmiddlewaretoken" :value="csrftoken">
+                            <button :disabled="loading || !message.trim()" type="submit" class="p-2 bg-[#00ff41] text-black rounded-lg hover:bg-[#00d92b] transition-smooth flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                                </svg>
+                            </button>
+                        </form>
+                    </div>
+
+                    <p class="text-xs text-[#737373] text-center mt-2">
+                        CyberGuide can make mistakes. Verify important security information.
+                    </p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Drag & Drop Overlay -->
+    <div id="dragOverlay" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50">
+        <div class="drag-overlay rounded-2xl p-12 text-center glow-green">
+            <div class="text-6xl mb-4">📎</div>
+            <h3 class="text-2xl font-bold mb-2">Drop files here</h3>
+            <p class="text-[#a3a3a3]">Supported: .py .js .cpp .java .php .rb .go .rs</p>
+        </div>
+    </div>
+
+    <!-- Analyzer pages moved to standalone templates at /tools/link/ and /tools/email/ -->
+
+    <script>
+        // track current session id so chat posts append to it
+        window.currentSessionId = null;
+        // Sidebar toggle (unchanged)
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebar = document.getElementById('sidebar');
+        sidebarToggle?.addEventListener('click', () => { sidebar.classList.toggle('hidden'); });
+
+        // Tooling Alpine component (minimal: only csrftoken available)
+        function tooling() {
+            return {
+                csrftoken: (function(){
+                    const match = document.cookie.match('(^|;)\\s*' + 'csrftoken' + '\\s*=\\s*([^;]+)');
+                    return match ? match.pop() : '';
+                })()
+            };
+        }
+
+        // Chat component used by Alpine x-data
+        function chatComponent() {
+            return {
+                message: '',
+                loading: false,
+                ai_response: null,
+                raw_html: null,
+                csrftoken: (function(){
+                    const match = document.cookie.match('(^|;)\\s*' + 'csrftoken' + '\\s*=\\s*([^;]+)');
+                    return match ? match.pop() : '';
+                })(),
+                autoresize() {
+                    this.$refs.input.style.height = 'auto';
+                    this.$refs.input.style.height = Math.min(this.$refs.input.scrollHeight, 192) + 'px';
+                },
+                async submit() {
+                    const text = this.message.trim();
+                    if (!text) return;
+                    this.loading = true;
+                    this.ai_response = null;
+                    this.raw_html = null;
+
+                    const welcomeEl = document.getElementById('welcomeScreen'); if (welcomeEl) welcomeEl.classList.add('hidden');
+                    const chatMessages = document.getElementById('chatMessages') || document.getElementById('messagesContainer') || null;
+                    if (chatMessages && chatMessages.classList) chatMessages.classList.remove('hidden');
+                    const userMsg = document.createElement('div');
+                    userMsg.className = 'flex justify-end message-slide-up';
+                    userMsg.innerHTML = `\n                        <div class="max-w-[80%] bg-[#1a1a1a] border-l-2 border-[#00ff41] rounded-xl p-4">\n                            <p class="text-white">${escapeHtml(text)}</p>\n                        </div>\n                    `;
+                    if (chatMessages) chatMessages.appendChild(userMsg);
+                    const typingEl = document.getElementById('typingIndicator'); if (typingEl) typingEl.classList.remove('hidden');
+
+                    try {
+                        const params = {user_input: text};
+                        if (window.currentSessionId) params.session_id = window.currentSessionId;
+
+                        const resp = await fetch(window.location.pathname, {
+                            method: 'POST',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRFToken': this.csrftoken,
+                                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                            },
+                            body: new URLSearchParams(params)
+                        });
+
+                        const isJson = resp.headers.get('content-type')?.includes('application/json');
+                        const data = isJson ? await resp.json() : {ok: false, raw: await resp.text()};
+
+                        if (!resp.ok) {
+                            this.raw_html = escapeHtml(data.raw || JSON.stringify(data));
+                        } else {
+                            // attach session id if server returned one
+                            if (data.session_id) {
+                                    window.currentSessionId = data.session_id;
+                                    console.log('Server returned session_id:', data.session_id, 'session_reused=', data.session_reused);
+                                    const disp = document.getElementById('sessionIdDisplay'); if (disp) disp.textContent = data.session_id;
+                                }
+
+                            // if assistant_html provided, render it directly as HTML
+                            if (data.assistant_html) {
+                                const wrapper = document.createElement('div');
+                                wrapper.className = 'flex justify-start message-slide-up';
+                                wrapper.innerHTML = `
+                                    <div class="max-w-[80%] bg-[#141414] border-l-2 border-[#00d9ff] rounded-xl p-4">
+                                        <div class="flex items-center gap-2 mb-3">
+                                            <span class="text-xl">🤖</span>
+                                            <span class="font-semibold">CyberGuide</span>
+                                        </div>
+                                        <div class="text-sm text-[#a3a3a3]">${data.assistant_html}</div>
+                                    </div>
+                                `;
+                                if (chatMessages) chatMessages.appendChild(wrapper);
+                                this.ai_response = null;
+                                this.raw_html = null;
+                            } else if (data.ok === true && data.data) {
+                                this.ai_response = data.data;
+                            } else if (data.ok === false && data.raw) {
+                                this.raw_html = escapeHtml(data.raw);
+                            } else {
+                                if (data.data) this.ai_response = data.data;
+                                else if (data.raw) this.raw_html = escapeHtml(data.raw);
+                                else this.raw_html = escapeHtml(JSON.stringify(data));
+                            }
+                        }
+                    } catch (err) {
+                        this.raw_html = escapeHtml(String(err));
+                    } finally {
+                        this.loading = false;
+                        this.message = '';
+                        try { this.$refs.input.style.height = 'auto'; } catch (e) {}
+                        const typingEl2 = document.getElementById('typingIndicator'); if (typingEl2) typingEl2.classList.add('hidden');
+                        this.renderResponse();
+                        setTimeout(() => { const mc = document.getElementById('messagesContainer'); if (mc) mc.scrollTop = mc.scrollHeight; }, 50);
+                    }
+                },
+                renderResponse() {
+                    const chatMessages = document.getElementById('chatMessages') || document.getElementById('messagesContainer') || null;
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'flex justify-start message-slide-up';
+                    if (this.ai_response) {
+                        const summary = escapeHtml(this.ai_response.summary || 'Result');
+                        let checksHtml = '';
+                        if (Array.isArray(this.ai_response.checks)) {
+                            checksHtml = this.ai_response.checks.map(c => {
+                                const cmds = Array.isArray(c.commands) ? '<pre class="bg-[#0a0a0a] p-2 rounded mt-2 overflow-auto text-xs font-mono">' + escapeHtml(c.commands.join('\n')) + '</pre>' : '';
+                                const tools = Array.isArray(c.tools) ? '<div class="text-xs text-[#a3a3a3] mt-1">Tools: ' + escapeHtml(c.tools.join(', ')) + '</div>' : '';
+                                return `\n                                    <div class=\"p-3 bg-[#0a0a0a] border border-[#2a2a2a] rounded mb-2\">\n                                        <div class=\"flex items-center justify-between\">\n                                            <div class=\"font-semibold\">${escapeHtml(c.title || c.id || 'Check')}</div>\n                                            <div class=\"font-mono text-xs text-[#a3a3a3]\">${escapeHtml(c.severity || '')}</div>\n                                        </div>\n                                        <div class=\"text-sm text-[#a3a3a3] mt-1\">${escapeHtml(c.description || '')}</div>\n                                        ${cmds}\n                                        ${tools}\n                                    </div>\n                                `;
+                            }).join('\n');
+                        }
+
+                        wrapper.innerHTML = `\n                            <div class=\"max-w-[80%] bg-[#141414] border-l-2 border-[#00d9ff] rounded-xl p-4\">\n                                <div class=\"flex items-center gap-2 mb-3\">\n                                    <span class=\"text-xl\">🤖</span>\n                                    <span class=\"font-semibold\">CyberGuide</span>\n                                </div>\n                                <div class=\"text-sm text-[#a3a3a3]\">${summary}</div>\n                                <div class=\"mt-3\">${checksHtml}</div>\n                            </div>\n                        `;
+                    } else if (this.raw_html) {
+                        wrapper.innerHTML = `\n                            <div class=\"max-w-[80%] bg-[#141414] border-l-2 border-[#00d9ff] rounded-xl p-4\">\n                                <div class=\"flex items-center gap-2 mb-3\">\n                                    <span class=\"text-xl\">🤖</span>\n                                    <span class=\"font-semibold\">CyberGuide</span>\n                                </div>\n                                <div class=\"text-sm text-[#a3a3a3]\">${this.raw_html}</div>\n                            </div>\n                        `;
+                    } else {
+                        return;
+                    }
+                    if (chatMessages) chatMessages.appendChild(wrapper);
+                }
+            };
+        }
+
+        // small helper to escape HTML
+        function escapeHtml(unsafe) {
+            if (unsafe === null || unsafe === undefined) return '';
+            return String(unsafe)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // Drag & drop functionality (preserved)
+        const dragOverlay = document.getElementById('dragOverlay');
+        let dragCounter = 0;
+
+        document.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            dragCounter++;
+            if (dragCounter === 1) {
+                dragOverlay.classList.remove('hidden');
+                dragOverlay.classList.add('flex');
+            }
+        });
+
+        // History: load recent sessions into sidebar
+        async function loadHistoryList() {
+            try {
+                const resp = await fetch('/history/list/', {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const data = await resp.json();
+                const container = document.getElementById('historyList');
+                container.innerHTML = '';
+                if (data.ok && Array.isArray(data.data)) {
+                    data.data.forEach(s => {
+                        const btn = document.createElement('button');
+                        btn.className = 'w-full text-left p-3 bg-[#141414] hover:bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] transition-smooth';
+                        btn.innerHTML = `<div class="text-sm font-medium">${escapeHtml(s.title || ('Session ' + s.id))}</div><div class="text-xs text-[#737373] mt-1">${new Date(s.created_at).toLocaleString()}</div>`;
+                        btn.addEventListener('click', () => loadSession(s.id));
+                        container.appendChild(btn);
+                    });
+                } else {
+                    container.innerHTML = '<div class="text-xs text-[#737373]">No history</div>';
+                }
+            } catch (e) {
+                console.error('history load error', e);
+            }
+        }
+
+        // Load a specific session and render messages into the chat area
+        async function loadSession(sessionId) {
+            try {
+                const resp = await fetch(`/history/load/${sessionId}/`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const data = await resp.json();
+                if (!data.ok) return;
+                const chatMessages = document.getElementById('chatMessages') || document.getElementById('messagesContainer') || null;
+                if (chatMessages && chatMessages.innerHTML !== undefined) chatMessages.innerHTML = '';
+                const welcome = document.getElementById('welcomeScreen'); if (welcome) welcome.classList.add('hidden');
+                if (chatMessages && chatMessages.classList) chatMessages.classList.remove('hidden');
+
+                // set global session id so subsequent submits append to this session
+                window.currentSessionId = sessionId;
+                console.log('Loaded session:', sessionId);
+                const disp = document.getElementById('sessionIdDisplay'); if (disp) disp.textContent = sessionId;
+
+                for (const m of data.data.messages) {
+                    const el = document.createElement('div');
+                    el.className = m.role === 'user' ? 'flex justify-end message-slide-up' : 'flex justify-start message-slide-up';
+                    if (m.role === 'assistant') {
+                        // assistant content was stored as rendered HTML on the server; insert directly
+                        el.innerHTML = `<div class="max-w-[80%] bg-[#141414] border-l-2 border-[#00d9ff] rounded-xl p-4"><div class="flex items-center gap-2 mb-3"><span class="text-xl">🤖</span><span class="font-semibold">CyberGuide</span></div><div class="text-sm text-[#a3a3a3]">${m.content}</div></div>`;
+                    } else {
+                        // user messages should be escaped
+                        el.innerHTML = `<div class="max-w-[80%] bg-[#1a1a1a] border-l-2 border-[#00ff41] rounded-xl p-4"><p class="text-white">${escapeHtml(m.content)}</p></div>`;
+                    }
+                    chatMessages.appendChild(el);
+                }
+                setTimeout(() => { document.getElementById('messagesContainer').scrollTop = document.getElementById('messagesContainer').scrollHeight; }, 50);
+            } catch (e) {
+                console.error('load session error', e);
+            }
+        }
+
+        // load history on page ready
+        document.addEventListener('DOMContentLoaded', () => {
+            loadHistoryList();
+            const newBtn = document.getElementById('newSessionBtn');
+            if (newBtn) newBtn.addEventListener('click', (e) => {
+                window.currentSessionId = null;
+                const disp = document.getElementById('sessionIdDisplay'); if (disp) disp.textContent = '(none)';
+                console.log('Cleared currentSessionId - starting new session');
+            });
+
+            // small helper to read csrftoken from cookies (used for uploads)
+            function getCsrfToken() {
+                const match = document.cookie.match('(^|;)\\s*' + 'csrftoken' + '\\s*=\\s*([^;]+)');
+                return match ? match.pop() : '';
+            }
+
+            // wire upload button
+            const uploadBtn = document.getElementById('uploadBtn');
+            if (uploadBtn) uploadBtn.addEventListener('click', () => {
+                const fi = document.getElementById('fileInput');
+                if (!fi || !fi.files || fi.files.length === 0) return alert('Select a file first');
+                const file = fi.files[0];
+                const chatMessages = document.getElementById('chatMessages') || document.getElementById('messagesContainer');
+                // optimistic user upload message
+                let userMsgEl = null;
+                if (chatMessages) {
+                    userMsgEl = document.createElement('div');
+                    userMsgEl.className = 'flex justify-end message-slide-up';
+                    userMsgEl.innerHTML = `<div class="max-w-[80%] bg-[#1a1a1a] border-l-2 border-[#00ff41] rounded-xl p-4"><p class="text-white">Uploading ${escapeHtml(file.name)}</p><div id="upload_progress_${Date.now()}" class="mt-2 text-xs text-[#a3a3a3]">0%</div></div>`;
+                    chatMessages.appendChild(userMsgEl);
+                }
+
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/scan/upload/');
+                xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+                const tok = (document.cookie.match('(^|;)\\s*' + 'csrftoken' + '\\s*=\\s*([^;]+)') || [])[2];
+                if (tok) xhr.setRequestHeader('X-CSRFToken', tok);
+
+                xhr.upload.onprogress = function (e) {
+                    if (!e.lengthComputable) return;
+                    const pct = Math.round((e.loaded / e.total) * 100);
+                    const pr = userMsgEl && userMsgEl.querySelector('[id^="upload_progress_"]');
+                    if (pr) pr.textContent = pct + '%';
+                };
+
+                // show typing indicator while server processes the upload
+                const typingIndicator = document.getElementById('typingIndicator'); if (typingIndicator) typingIndicator.classList.remove('hidden');
+
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState !== XMLHttpRequest.DONE) return;
+                    if (xhr.status === 200) {
+                        let data = null;
+                        try { data = JSON.parse(xhr.responseText); } catch (e) { alert('Upload failed: server returned non-JSON response'); return; }
+                        if (!data.ok) return alert('Upload error: ' + (data.error || JSON.stringify(data)));
+                        if (data.session_id) { window.currentSessionId = data.session_id; const disp = document.getElementById('sessionIdDisplay'); if (disp) disp.textContent = data.session_id; }
+                        if (data.assistant_html) {
+                            // mark upload progress as done
+                            const pr = userMsgEl && userMsgEl.querySelector('[id^="upload_progress_"]');
+                            if (pr) pr.textContent = 'Done';
+
+                            const wrapper = document.createElement('div');
+                            wrapper.className = 'flex justify-start message-slide-up';
+                            wrapper.innerHTML = `<div class="max-w-[80%] bg-[#141414] border-l-2 border-[#00d9ff] rounded-xl p-4"><div class="flex items-center gap-2 mb-3"><span class="text-xl">🤖</span><span class="font-semibold">CyberGuide</span></div><div class="text-sm text-[#a3a3a3]">${data.assistant_html}</div></div>`;
+                            if (chatMessages) chatMessages.appendChild(wrapper);
+                            // hide typing indicator after rendering
+                            if (typingIndicator) typingIndicator.classList.add('hidden');
+                            // scroll to bottom
+                            setTimeout(() => { const mc = document.getElementById('messagesContainer'); if (mc) mc.scrollTop = mc.scrollHeight; }, 50);
+                        }
+                    } else if (xhr.status === 403) {
+                        alert('Upload forbidden (403). CSRF token missing or invalid.');
+                        const typingIndicator2 = document.getElementById('typingIndicator'); if (typingIndicator2) typingIndicator2.classList.add('hidden');
+                    } else {
+                        alert('Upload failed: HTTP ' + xhr.status);
+                        const typingIndicator3 = document.getElementById('typingIndicator'); if (typingIndicator3) typingIndicator3.classList.add('hidden');
+                    }
+                };
+
+                const fd = new FormData();
+                fd.append('file', file);
+                if (window.currentSessionId) fd.append('session_id', window.currentSessionId);
+                xhr.send(fd);
+            });
+        });
+
+        document.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dragCounter--;
+            if (dragCounter === 0) {
+                dragOverlay.classList.add('hidden');
+                dragOverlay.classList.remove('flex');
+            }
+        });
+
+        document.addEventListener('dragover', (e) => { e.preventDefault(); });
+
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragCounter = 0;
+            dragOverlay.classList.add('hidden');
+            dragOverlay.classList.remove('flex');
+            const files = Array.from(e.dataTransfer.files);
+            console.log('Files dropped:', files);
+        });
+
+        // Suggested prompts wired to Alpine model (sets input and focuses)
+        document.querySelectorAll('#suggestedPrompts button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const text = btn.textContent.trim();
+                // fill chat input by default
+                const input = document.getElementById('messageInput');
+                if (input) {
+                    input.value = text;
+                    input.dispatchEvent(new Event('input'));
+                    input.focus();
+                }
+
+                // if the suggested prompt looks like a URL, navigate to link analyzer and prefill via query
+                if (/https?:\/\//i.test(text) || /\./.test(text)) {
+                    const encoded = encodeURIComponent(text);
+                    window.location.href = '/tools/link/?q=' + encoded;
+                } else if (text.includes('@')) {
+                    const encoded = encodeURIComponent(text);
+                    window.location.href = '/tools/email/?q=' + encoded;
+                }
+            });
+        });
+    </script>
+</body>
+</html>

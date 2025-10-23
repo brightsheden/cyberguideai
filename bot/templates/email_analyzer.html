@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Analyze Email — CyberGuide</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-[#0a0a0a] text-white">
+    <header class="fixed top-0 left-0 right-0 h-16 bg-black/80 backdrop-blur-md border-b border-[#2a2a2a] z-50">
+        <div class="max-w-full h-full px-6 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="text-2xl">🛡️</div>
+                <h1 class="font-header text-2xl font-bold tracking-tight">CYBERGUIDE</h1>
+            </div>
+            <div>
+                <a href="/" class="text-sm text-[#a3a3a3] hover:text-[#00ff41]">Back</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="pt-20 max-w-3xl mx-auto p-6">
+        <div class="bg-[#0f172a] border border-[#2a2a2a] rounded-xl p-6">
+            <h2 class="text-lg font-semibold mb-3">✉️ Analyze Email</h2>
+            <p class="text-sm text-[#a3a3a3] mb-4">Paste the email headers and body below to run a passive analysis for phishing indicators.</p>
+
+            <div class="space-y-3">
+                <textarea id="email_input" rows="10" placeholder="Paste full email (headers + body) here" class="w-full p-3 bg-[#141414] border border-[#2a2a2a] rounded text-sm"></textarea>
+                <div class="flex gap-2">
+                    <button id="runEmailBtn" class="px-4 py-2 bg-[#00d9ff] text-black rounded">Analyze</button>
+                    <button id="emailClearBtn" class="px-4 py-2 border rounded">Clear</button>
+                </div>
+                <div id="emailResult" class="mt-4 hidden bg-[#0a0a0a] p-3 rounded text-sm"></div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        async function postEmail(body) {
+            try {
+                const resp = await fetch('/analyze/email/', {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'X-CSRFToken': (document.cookie.match('(^|;)\\s*' + 'csrftoken' + '\\s*=\\s*([^;]+)') || [])[2]
+                    },
+                    body: new URLSearchParams({body: body})
+                });
+                const data = await resp.json();
+                return data;
+            } catch (e) {
+                return {ok:false, error: String(e)};
+            }
+        }
+
+        document.getElementById('runEmailBtn').addEventListener('click', async () => {
+            const val = document.getElementById('email_input').value || '';
+            if (!val.trim()) return alert('Paste the email contents first');
+            const out = document.getElementById('emailResult');
+            out.classList.remove('hidden');
+            out.innerHTML = '<div class="text-sm text-[#a3a3a3]">Analyzing…</div>';
+            const res = await postEmail(val);
+            renderEmailResult(out, res);
+        });
+        document.getElementById('emailClearBtn').addEventListener('click', () => { document.getElementById('email_input').value=''; document.getElementById('emailResult').classList.add('hidden'); });
+
+        // Prefill from query param 'q' if present
+        (function(){
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const q = params.get('q');
+                if (q) {
+                    const el = document.getElementById('email_input');
+                    if (el) el.value = decodeURIComponent(q);
+                }
+            } catch(e){}
+        })();
+
+        // Render the structured analyzer result into the target element
+        function renderEmailResult(container, resp) {
+            if (!resp) {
+                container.innerHTML = '<div class="text-red-400">No response from server</div>';
+                return;
+            }
+            if (!resp.ok) {
+                const err = escapeHtml(resp.error || JSON.stringify(resp));
+                container.innerHTML = `<div class="text-red-400">Error: ${err}</div>`;
+                return;
+            }
+
+            const d = resp.data || {};
+            const suspicious = d.suspicious === true;
+
+            let html = '';
+            html += `<div class="flex items-center gap-3 mb-3">
+                        <div class="text-xl">✉️</div>
+                        <div>
+                            <div class="font-semibold">Email analysis</div>
+                            <div class="text-xs text-[#9ca3af]">Summary</div>
+                        </div>
+                     </div>`;
+
+            html += `<div class="mb-3">
+                        <span class="inline-block px-2 py-1 text-xs rounded ${suspicious ? 'bg-red-600 text-white' : 'bg-green-800 text-green-200'}">${suspicious ? 'Suspicious' : 'Likely safe'}</span>
+                     </div>`;
+
+            if (Array.isArray(d.reasons) && d.reasons.length) {
+                html += `<div class="mb-3 text-sm text-[#a3a3a3]"><strong>Reasons:</strong><ul class="list-disc ml-5 mt-1">${d.reasons.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul></div>`;
+            }
+
+            // links table
+            if (Array.isArray(d.links) && d.links.length) {
+                html += `<div class="mt-2"><div class="font-semibold mb-2">Links found</div><div class="space-y-3">`;
+                for (const l of d.links) {
+                    const l_susp = l.suspicious === true;
+                    const url = escapeHtml(l.url || '');
+                    const reasons = Array.isArray(l.reasons) ? l.reasons : [];
+                    const comp = l.components || {};
+                    const host = escapeHtml(comp.host || '');
+                    const port = comp.port !== undefined && comp.port !== null ? String(comp.port) : '';
+                    const path = escapeHtml(comp.path || '');
+                    const scheme = escapeHtml(comp.scheme || '');
+                    const query = escapeHtml(comp.query || '');
+
+                    html += `<div class="p-3 bg-[#071018] border border-[#111827] rounded">
+                                <div class="flex items-center justify-between">
+                                    <div class="text-sm break-all"><a href="${url}" target="_blank" rel="noopener noreferrer" class="text-cyan-300 hover:underline">${url}</a></div>
+                                    <div><span class="inline-block px-2 py-1 text-xs rounded ${l_susp ? 'bg-red-600 text-white' : 'bg-green-800 text-green-200'}">${l_susp ? 'Suspicious' : 'OK'}</span></div>
+                                </div>
+                                ${reasons.length ? `<div class="text-xs text-[#9ca3af] mt-2">Reasons: ${reasons.map(r=>`<span class="inline-block mr-2">${escapeHtml(r)}</span>`).join('')}</div>` : ''}
+                                <div class="mt-2 text-xs text-[#9ca3af] grid grid-cols-2 gap-2">
+                                    <div><strong>Host</strong><div>${host}${port ? ':'+port : ''}</div></div>
+                                    <div><strong>Path</strong><div>${path}${query ? '<span class="text-[#6ee7b7]">?'+query+'</span>' : ''}</div></div>
+                                    <div><strong>Scheme</strong><div>${scheme}</div></div>
+                                    <div><strong>Raw query</strong><div class="break-all text-xs">${query || '-'}</div></div>
+                                </div>
+                              </div>`;
+                }
+                html += `</div></div>`;
+            }
+
+            if (!d.links || d.links.length === 0) {
+                html += `<div class="text-sm text-[#9ca3af] mt-3">No links detected in the provided email.</div>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        // small helper to escape HTML (same as used elsewhere)
+        function escapeHtml(unsafe) {
+            if (unsafe === null || unsafe === undefined) return '';
+            return String(unsafe)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+    </script>
+</body>
+</html>
